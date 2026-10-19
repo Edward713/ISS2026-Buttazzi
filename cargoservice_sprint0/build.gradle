@@ -1,0 +1,43 @@
+plugins {
+    id 'org.jetbrains.kotlin.jvm' version '1.9.22'
+}
+repositories { mavenCentral() }
+dependencies {
+    // Infrastruttura del corso per compilare il Kotlin generato.
+    implementation files('libs/unibo.qakactor23-5.0.jar', 'libs/unibo.basicomm23-1.0.jar', 'libs/2p301.jar', 'libs/uniboInterfaces.jar')
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.9.22'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.7.3'
+    implementation 'org.eclipse.californium:californium-core:3.5.0'
+    implementation 'org.eclipse.californium:californium-proxy2:3.5.0'
+    implementation 'org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5'
+    implementation 'com.googlecode.json-simple:json-simple:1.1.1'
+    implementation 'org.json:json:20180130'
+    implementation 'ch.qos.logback:logback-classic:1.2.11'
+    testImplementation 'junit:junit:4.13.2'
+}
+java { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
+kotlin { compilerOptions { jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17 } }
+sourceSets.main.kotlin.srcDir('src/it')
+
+// Avvio locale dei quattro contesti senza richiedere l'editor Kotlin di Eclipse.
+tasks.register('runCargoSystem', JavaExec) {
+    group = 'application'
+    description = 'Avvia lo scheletro Sprint0 nei quattro contesti locali.'
+    dependsOn tasks.named('classes')
+    mainClass.set('it.unibo.cargo.MainCargoSystemKt')
+    classpath = sourceSets.main.runtimeClasspath
+    workingDir = projectDir
+}
+tasks.register('generateQak', Exec) {
+    group = 'build'
+    description = 'Rigenera il modello QAK di Sprint 0 con il generatore UniBo.'
+    commandLine 'powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'scripts/generate-qak.ps1'
+}
+test { useJUnit(); testLogging { events 'passed', 'failed', 'skipped' } }
+// Preferire JUnit esplicito alla vecchia versione incorporata nel jar tuProlog.
+tasks.named('compileTestJava') {
+    classpath = files(configurations.testCompileClasspath.filter { it.name.startsWith('junit-') }) + classpath
+}
+tasks.named('test') {
+    classpath = files(configurations.testRuntimeClasspath.filter { it.name.startsWith('junit-') }) + classpath
+}

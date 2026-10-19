@@ -1,0 +1,132 @@
+System cargoservice_term
+
+Request load_request : load_request(none)
+Reply load_accepted : load_accepted(SLOT) for load_request
+Reply retrylater : retrylater(none) for load_request
+Reply load_refused : load_refused(none) for load_request
+Dispatch button_pressed : button_pressed(none)
+Dispatch display_update : display_update(DATA)
+Dispatch led_command : led_command(MODE)
+Dispatch sensor_state : sensor_state(CONDITION)
+
+Request reach_target : reach_target(TARGET)
+Reply target_reached : target_reached(TARGET) for reach_target
+Dispatch sonar_sample : sonar_sample(D)
+
+
+Context ctxcargoservice ip [host="localhost" port=8020]
+Context ctxioport ip [host="localhost" port=8021]
+Context ctxrobot ip [host="localhost" port=8022]
+Context ctxsensor ip [host="localhost" port=8023]
+
+QActor cargoservice context ctxcargoservice {
+    import "it.unibo.cargo.model.HoldInventory"
+    import "it.unibo.cargo.model.ServiceStatus"
+    [#
+        val inventory = HoldInventory()
+
+        val serviceStatus = ServiceStatus.WORKING
+        val ioportOccupied = false
+        var engaged = false
+    #]
+    State waiting initial { }
+    Transition t0 whenRequest load_request -> evaluate_request
+
+    State evaluate_request {
+        if [# engaged || ioportOccupied || serviceStatus == ServiceStatus.OUT_OF_SERVICE #] {
+            replyTo load_request with retrylater : retrylater(none)
+        }
+        else {
+            [# val FreeSlot = inventory.reserveFirstAvailable() #]
+            if [# FreeSlot.isEmpty #] {
+                replyTo load_request with load_refused : load_refused(none)
+            }
+            else {
+                [# val Slot = "slot${FreeSlot.asInt}"; engaged = true #]
+                replyTo load_request with load_accepted : load_accepted($Slot)
+            }
+        }
+ 
+    }
+    Goto waiting
+}
+
+QActor ioportservice context ctxioport {
+    State waiting initial { }
+    Transition t0
+        whenMsg button_pressed -> send_request
+        whenReply load_accepted -> show_response
+        whenReply retrylater -> show_response
+        whenReply load_refused -> show_response
+        whenMsg display_update -> update_display
+        whenMsg led_command -> update_led
+
+    State send_request {
+        request cargoservice -m load_request : load_request(none)
+    }
+    Goto waiting
+    State show_response {
+        onMsg(load_accepted : load_accepted(Slot)) {
+            [# val Slot = payloadArg(0) #]
+            println("[IOPORT] slot assegnato $Slot")
+        }
+        onMsg(retrylater : retrylater(none)) {
+            println("[IOPORT] riprovare piu tardi")
+        }
+        onMsg(load_refused : load_refused(none)) {
+            println("[IOPORT] stiva piena")
+        }
+    }
+    Goto waiting
+    State update_display {
+
+    }
+    Goto waiting
+    State update_led {
+
+    }
+    Goto waiting
+}
+
+QActor cargorobot context ctxrobot {
+
+    State waiting initial {
+        println("[CARGOROBOT] pronto a ricevere una destinazione")
+    }
+    Transition t0 whenRequest reach_target -> reaching
+
+    State reaching {
+        onMsg(reach_target : reach_target(Target)) {
+            [# val Destination = payloadArg(0) #]
+            println("[CARGOROBOT] spostamento simulato verso $Destination")
+            replyTo reach_target with target_reached : target_reached($Destination)
+        }
+    }
+    Goto waiting
+}
+
+QActor sensorservice context ctxsensor {
+    [# val DFREE = 100.0 #]
+    State waiting initial {
+        println("[SENSOR] attesa del sonar")
+    }
+    Transition t0 whenMsg sonar_sample -> evaluate_sample
+
+    State evaluate_sample {
+        onMsg(sonar_sample : sonar_sample(D)) {
+            [# val Distance = payloadArg(0).toDouble() #]
+            if [# Distance < DFREE / 2 #] {
+                println("[SENSOR] possibile presenza: da confermare per 3 secondi di fila")
+            }
+            else {
+                if [# Distance > DFREE #] {
+                    println("[SENSOR] possibile anomalia: da confermare per 3 secondi di fila")
+                }
+                else {
+                    println("[SENSOR] nessuna presenza o anomalia rilevata")
+                }
+            }
+        }
+    }
+    Goto waiting
+}
