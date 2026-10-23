@@ -1,0 +1,518 @@
+System cargoservice_term
+
+Request load_request : load_request(none)
+Reply load_accepted : load_accepted(SLOT) for load_request
+Reply retrylater : retrylater(none) for load_request
+Reply load_refused : load_refused(none) for load_request
+Request get_hold_status : get_hold_status(none)
+Reply hold_state : hold_state(DATA) for get_hold_status
+Request setup_hold : setup_hold(MODE)
+Reply preset_ack : preset_ack(RESULT) for setup_hold
+Dispatch button_pressed : button_pressed(none)
+Dispatch display_update : display_update(DATA)
+Dispatch led_command : led_command(MODE)
+Dispatch sensor_state : sensor_state(CONDITION)
+Event sonar_sample : sonar_sample(D)
+Dispatch wait_timeout : wait_timeout(ID)
+Dispatch marker_done : marker_done(ID)
+Dispatch navigation_timeout : navigation_timeout(ID,TARGET)
+
+Request reach_target : reach_target(TARGET)
+Reply target_reached : target_reached(TARGET) for reach_target
+Reply target_failed : target_failed(TARGET) for reach_target
+Request moverobot : moverobot(X,Y,STEPTIME)
+Reply moverobotdone : moverobotok(ARG) for moverobot
+Reply moverobotfailed : moverobotfailed(DONE,TODO) for moverobot
+Reply failed : failed(REASON) for moverobot
+Dispatch move_done : move_done(ID)
+Dispatch move_failed : move_failed(ID)
+Request mock_control : mock_control(TARGET,DELAY)
+Reply mock_ack : mock_ack(RESULT) for mock_control
+Request get_robot_status : get_robot_status(none)
+Reply robot_status : robot_status(DATA) for get_robot_status
+Request get_sensor_status : get_sensor_status(none)
+Reply sensor_status : sensor_status(DATA) for get_sensor_status
+Request reset_sensor : reset_sensor(none)
+Reply sensor_reset : sensor_reset(RESULT) for reset_sensor
+Request get_ioport_status : get_ioport_status(none)
+Reply ioport_status : ioport_status(DATA) for get_ioport_status
+
+Context ctxcargoservice ip [host="localhost" port=8020]
+Context ctxcargorobot ip [host="localhost" port=8021]
+Context ctxioport ip [host="localhost" port=8022]
+Context ctxsensor ip [host="localhost" port=8023]
+Context ctxrobotsmart ip [host="127.0.0.1" port=8019]
+ExternalQActor robotsmart context ctxrobotsmart
+
+QActor cargoservice context ctxcargoservice {
+    import "it.unibo.cargo.tools.MessagePayload"
+    import "it.unibo.cargo.model.CargoState"
+    import "it.unibo.cargo.model.CargoConfig"
+    import "it.unibo.cargo.model.LoadOperation.Phase"
+    import "it.unibo.cargo.model.ServiceStatus"
+    import "kotlinx.coroutines.Job"
+    [#
+        val model = CargoState()
+        var waitJob: Job? = null
+        var markerJob: Job? = null
+        var navigationJob: Job? = null
+        var startMove = false
+        var markerCompleted = false
+    #]
+    State boot initial {
+        println("[CARGO] Sprint1 pronto sulla porta 8020")
+    }
+    Goto disengaged
+
+    // Gli stati di attesa hanno azioni vuote: rientrarvi non riavvia alcun timer.
+    State disengaged { }
+    Transition td
+        whenRequest load_request -> evaluate_request
+        whenRequest get_hold_status -> report_hold
+        whenRequest setup_hold -> preset_hold
+        whenMsg sensor_state -> presence
+        whenMsg wait_timeout -> expire_wait
+        whenMsg marker_done -> marking_completed
+        whenMsg navigation_timeout -> navigation_expired
+        whenReply target_reached -> robot_arrived
+        whenReply target_failed -> robot_failure
+
+    State wait_container { }
+    Transition tw
+        whenRequest load_request -> busy_retrylater
+        whenRequest get_hold_status -> report_hold
+        whenRequest setup_hold -> preset_hold
+        whenMsg sensor_state -> presence
+        whenMsg wait_timeout -> expire_wait
+        whenMsg marker_done -> marking_completed
+        whenMsg navigation_timeout -> navigation_expired
+        whenReply target_reached -> robot_arrived
+        whenReply target_failed -> robot_failure
+
+    State to_ioport { }
+    Transition ti
+        whenRequest load_request -> busy_retrylater
+        whenRequest get_hold_status -> report_hold
+        whenRequest setup_hold -> preset_hold
+        whenMsg sensor_state -> presence
+        whenMsg wait_timeout -> expire_wait
+        whenMsg marker_done -> marking_completed
+        whenMsg navigation_timeout -> navigation_expired
+        whenReply target_reached -> robot_arrived
+        whenReply target_failed -> robot_failure
+
+    State to_slot5 { }
+    Transition ts
+        whenRequest load_request -> busy_retrylater
+        whenRequest get_hold_status -> report_hold
+        whenRequest setup_hold -> preset_hold
+        whenMsg sensor_state -> presence
+        whenMsg wait_timeout -> expire_wait
+        whenMsg marker_done -> marking_completed
+        whenMsg navigation_timeout -> navigation_expired
+        whenReply target_reached -> robot_arrived
+        whenReply target_failed -> robot_failure
+
+    State wait_marker { }
+    Transition tm
+        whenRequest load_request -> busy_retrylater
+        whenRequest get_hold_status -> report_hold
+        whenRequest setup_hold -> preset_hold
+        whenMsg sensor_state -> presence
+        whenMsg wait_timeout -> expire_wait
+        whenMsg marker_done -> marking_completed
+        whenMsg navigation_timeout -> navigation_expired
+        whenReply target_reached -> robot_arrived
+        whenReply target_failed -> robot_failure
+
+    State to_final { }
+    Transition tf
+        whenRequest load_request -> busy_retrylater
+        whenRequest get_hold_status -> report_hold
+        whenRequest setup_hold -> preset_hold
+        whenMsg sensor_state -> presence
+        whenMsg wait_timeout -> expire_wait
+        whenMsg marker_done -> marking_completed
+        whenMsg navigation_timeout -> navigation_expired
+        whenReply target_reached -> robot_arrived
+        whenReply target_failed -> robot_failure
+
+    State return_home { }
+    Transition th
+        whenRequest load_request -> busy_retrylater
+        whenRequest get_hold_status -> report_hold
+        whenRequest setup_hold -> preset_hold
+        whenMsg sensor_state -> presence
+        whenMsg wait_timeout -> expire_wait
+        whenMsg marker_done -> marking_completed
+        whenMsg navigation_timeout -> navigation_expired
+        whenReply target_reached -> robot_arrived
+        whenReply target_failed -> robot_failure
+
+    State out_of_service { }
+    Transition toos
+        whenRequest load_request -> busy_retrylater
+        whenRequest get_hold_status -> report_hold
+        whenRequest setup_hold -> preset_hold
+        whenMsg sensor_state -> presence
+        whenMsg wait_timeout -> expire_wait
+        whenMsg marker_done -> marking_completed
+        whenMsg navigation_timeout -> navigation_expired
+        whenReply target_reached -> robot_arrived
+        whenReply target_failed -> robot_failure
+
+    State evaluate_request {
+        if [# !model.canAccept() #] {
+            replyTo load_request with retrylater : retrylater(none)
+        } else {
+            if [# model.accept(System.currentTimeMillis(), CargoConfig.waitMillis()) #] {
+                [#
+                    val Slot = "slot${model.operation().slotId()}"
+                    val Id = model.operation().id()
+                    val Remaining = maxOf(1L, model.operation().arrivalDeadlineMillis() - System.currentTimeMillis())
+                    waitJob?.cancel()
+                    waitJob = scope.launch {
+                        delay(Remaining)
+                        autoMsg("wait_timeout", "wait_timeout($Id)")
+                    }
+                #]
+                replyTo load_request with load_accepted : load_accepted($Slot)
+                forward sensorservice -m led_command : led_command(blink)
+                [# val Data = model.snapshot() #]
+                [# forward("display_update", "display_update('$Data')", "ioportservice") #]
+            } else {
+                replyTo load_request with load_refused : load_refused(none)
+            }
+        }
+    }
+    Goto route
+
+    State busy_retrylater {
+        replyTo load_request with retrylater : retrylater(none)
+    }
+    Goto route
+
+    State report_hold {
+        [# val Data = model.snapshot() #]
+        [# answer("get_hold_status", "hold_state", "hold_state('$Data')") #]
+    }
+    Goto route
+
+    State preset_hold {
+        [# val Result = model.setup(MessagePayload.arg(currentMsg.msgContent(), 0), CargoConfig.testMode()) #]
+        if [# Result == "ok" #] {
+            [# waitJob?.cancel(); markerJob?.cancel(); navigationJob?.cancel() #]
+            forward sensorservice -m led_command : led_command(off)
+            [# val Data = model.snapshot() #]
+            [# forward("display_update", "display_update('$Data')", "ioportservice") #]
+        }
+        replyTo setup_hold with preset_ack : preset_ack($Result)
+    }
+    Goto route
+
+    State presence {
+        [#
+            val Condition = MessagePayload.arg(currentMsg.msgContent(), 0)
+            // Solo il sensore applicativo puo confermare una presenza.
+            val Trusted = currentMsg.msgSender() == "sensorservice"
+            if (Trusted) model.sensor(Condition)
+        #]
+        [# startMove = Trusted && Condition == "present" && model.confirmPresence(System.currentTimeMillis()) #]
+        if [# startMove #] {
+            [# waitJob?.cancel() #]
+        }
+    }
+    Goto start_navigation if [# startMove #] else route
+
+    State expire_wait {
+        if [# model.expire(MessagePayload.arg(currentMsg.msgContent(), 0), System.currentTimeMillis()) #] {
+            [# waitJob?.cancel(); waitJob = null #]
+            forward sensorservice -m led_command : led_command(off)
+            [# val Data = model.snapshot() #]
+            [# forward("display_update", "display_update('$Data')", "ioportservice") #]
+        }
+    }
+    Goto route
+
+    State start_navigation {
+        [#
+            val Target = model.operation().target().name.lowercase()
+            val Id = model.operation().id()
+            navigationJob?.cancel()
+            navigationJob = scope.launch {
+                delay(CargoConfig.navigationMillis())
+                autoMsg("navigation_timeout", "navigation_timeout($Id,$Target)")
+            }
+        #]
+        request cargorobot -m reach_target : reach_target($Target)
+    }
+    Goto route
+
+    State robot_arrived {
+        [# val Valid = currentMsg.msgSender() == "cargorobot" && model.expects(MessagePayload.arg(currentMsg.msgContent(), 0)) #]
+        if [# Valid #] {
+            [#
+                navigationJob?.cancel(); navigationJob = null
+                model.arrive(MessagePayload.arg(currentMsg.msgContent(), 0))
+                val Data = model.snapshot()
+            #]
+            [# forward("display_update", "display_update('$Data')", "ioportservice") #]
+            if [# model.phase() == Phase.WAIT_MARKER #] {
+                [#
+                    val Id = model.operation().id()
+                    markerJob = scope.launch {
+                        delay(CargoConfig.markerMillis())
+                        autoMsg("marker_done", "marker_done($Id)")
+                    }
+                #]
+            }
+            if [# model.phase() == Phase.DISENGAGED #] {
+                forward sensorservice -m led_command : led_command(off)
+            }
+        }
+    }
+    Goto after_arrival
+    State after_arrival { }
+    Goto start_navigation if [# model.status() == ServiceStatus.WORKING && model.operation() != null && model.operation().navigationState().name == "MOVING" && navigationJob == null #] else route
+
+    State marking_completed {
+        [# markerCompleted = model.finishMarking(MessagePayload.arg(currentMsg.msgContent(), 0)) #]
+    }
+    Goto start_navigation if [# markerCompleted #] else route
+
+    State robot_failure {
+        if [# currentMsg.msgSender() == "cargorobot" && model.expects(MessagePayload.arg(currentMsg.msgContent(), 0)) #] {
+            [# model.fail("navigation_failed_" + MessagePayload.arg(currentMsg.msgContent(), 0)) #]
+        }
+    }
+    Goto failure_notice if [# model.status() == ServiceStatus.OUT_OF_SERVICE #] else route
+
+    State navigation_expired {
+        if [# model.operation() != null && model.operation().id() == MessagePayload.arg(currentMsg.msgContent(), 0) && model.expects(MessagePayload.arg(currentMsg.msgContent(), 1)) #] {
+            [# model.fail("navigation_timeout_" + MessagePayload.arg(currentMsg.msgContent(), 1)) #]
+        }
+    }
+    Goto failure_notice if [# model.status() == ServiceStatus.OUT_OF_SERVICE #] else route
+
+    State failure_notice {
+        [# waitJob?.cancel(); markerJob?.cancel(); navigationJob?.cancel(); navigationJob = null #]
+        forward sensorservice -m led_command : led_command(off)
+        forward ioportservice -m display_update : display_update(Out_of_service)
+    }
+    Goto route
+
+    State route { }
+    Goto out_of_service if [# model.status() == ServiceStatus.OUT_OF_SERVICE #] else route_idle
+    State route_idle { }
+    Goto disengaged if [# model.phase() == Phase.DISENGAGED #] else route_wait
+    State route_wait { }
+    Goto wait_container if [# model.phase() == Phase.WAIT_CONTAINER #] else route_io
+    State route_io { }
+    Goto to_ioport if [# model.phase() == Phase.TO_IOPORT #] else route_five
+    State route_five { }
+    Goto to_slot5 if [# model.phase() == Phase.TO_SLOT5 #] else route_marker
+    State route_marker { }
+    Goto wait_marker if [# model.phase() == Phase.WAIT_MARKER #] else route_final
+    State route_final { }
+    Goto to_final if [# model.phase() == Phase.TO_FINAL #] else return_home
+}
+
+QActor cargorobot context ctxcargorobot {
+    import "it.unibo.cargo.tools.MessagePayload"
+    import "it.unibo.cargo.model.CargoLayout"
+    import "it.unibo.cargo.model.CargoConfig"
+    import "it.unibo.cargo.model.Target"
+    import "java.util.UUID"
+    import "org.json.JSONArray"
+    import "kotlinx.coroutines.Job"
+    [#
+        val layout = CargoLayout()
+        var target = "home"
+        var navigationState = "IDLE"
+        var token = ""
+        var failTarget = "none"
+        var mockDelay = 200L
+        var job: Job? = null
+        var history = JSONArray()
+    #]
+    State idle initial { }
+    Transition tr
+        whenRequest reach_target -> moving
+        whenRequest mock_control -> configure_mock
+        whenRequest get_robot_status -> report_robot
+        whenMsg move_done -> discard_late
+        whenMsg move_failed -> discard_late
+        whenReply moverobotdone -> discard_late
+        whenReply moverobotfailed -> discard_late
+        whenReply failed -> discard_late
+
+    State moving {
+        [#
+            target = MessagePayload.arg(currentMsg.msgContent(), 0).lowercase()
+            token = "move_" + UUID.randomUUID().toString().replace("-", "")
+            navigationState = "MOVING"
+            history.put(target)
+            val Token = token
+            val destination = runCatching { layout.destination(Target.valueOf(target.uppercase())).accessPoint() }.getOrNull()
+            if (destination == null) {
+                autoMsg("move_failed", "move_failed($Token)")
+            } else if (CargoConfig.mockRobot()) {
+                val fail = target == failTarget
+                job = scope.launch {
+                    delay(mockDelay)
+                    if (fail) autoMsg("move_failed", "move_failed($Token)")
+                    else autoMsg("move_done", "move_done($Token)")
+                }
+            } else {
+                job = scope.launch {
+                    delay(CargoConfig.navigationMillis())
+                    autoMsg("move_failed", "move_failed($Token)")
+                }
+                try {
+                    request("moverobot", "moverobot(${destination.row()},${destination.column()},${CargoConfig.stepMillis()})", "robotsmart")
+                } catch (ex: Exception) {
+                    autoMsg("move_failed", "move_failed($Token)")
+                }
+            }
+        #]
+    }
+    Goto waiting_move
+    State waiting_move { }
+    Transition tn
+        whenMsg move_done -> mock_arrived
+        whenMsg move_failed -> mock_failed
+        whenReply moverobotdone -> arrived
+        whenReply moverobotfailed -> failed_move
+        whenReply failed -> failed_move
+        whenRequest get_robot_status -> report_moving
+        whenRequest mock_control -> reject_mock
+
+    State mock_arrived { }
+    Goto arrived if [# MessagePayload.arg(currentMsg.msgContent(), 0) == token #] else waiting_move
+    State mock_failed { }
+    Goto failed_move if [# MessagePayload.arg(currentMsg.msgContent(), 0) == token #] else waiting_move
+
+    State arrived {
+        [# job?.cancel(); navigationState = "ARRIVED"; val TargetName = target #]
+        replyTo reach_target with target_reached : target_reached($TargetName)
+    }
+    Goto idle
+    State failed_move {
+        [# job?.cancel(); navigationState = "FAILED"; val TargetName = target #]
+        replyTo reach_target with target_failed : target_failed($TargetName)
+    }
+    Goto idle
+    State discard_late { }
+    Goto idle
+
+    State configure_mock {
+        [#
+            val delay = MessagePayload.arg(currentMsg.msgContent(), 1).toLongOrNull()
+            val allowed = CargoConfig.testMode() && CargoConfig.mockRobot() && delay != null && delay > 0
+            val Result = if (allowed) "ok" else "disabled_or_invalid"
+            if (allowed) { failTarget = MessagePayload.arg(currentMsg.msgContent(), 0).lowercase(); mockDelay = delay!!; history = JSONArray() }
+        #]
+        replyTo mock_control with mock_ack : mock_ack($Result)
+    }
+    Goto idle
+    State reject_mock {
+        replyTo mock_control with mock_ack : mock_ack(busy)
+    }
+    Goto waiting_move
+    State report_robot {
+        [# val Data = org.json.JSONObject().put("navigationState", navigationState).put("target", target).put("history", history).toString() #]
+        [# answer("get_robot_status", "robot_status", "robot_status('$Data')") #]
+    }
+    Goto idle
+    State report_moving {
+        [# val Data = org.json.JSONObject().put("navigationState", navigationState).put("target", target).put("history", history).toString() #]
+        [# answer("get_robot_status", "robot_status", "robot_status('$Data')") #]
+    }
+    Goto waiting_move
+}
+
+QActor sensorservice context ctxsensor {
+    import "it.unibo.cargo.tools.MessagePayload"
+    import "it.unibo.cargo.model.PresenceDetector"
+    import "it.unibo.cargo.model.CargoConfig"
+    [#
+        var detector = PresenceDetector(CargoConfig.freeDistance(), CargoConfig.presenceMillis(), CargoConfig.sampleGapMillis())
+        var led = "off"
+        var notifications = 0
+    #]
+    State monitoring initial { }
+    Transition tmon
+        whenEvent sonar_sample -> eval_sample
+        whenMsg led_command -> update_led
+        whenRequest get_sensor_status -> report_sensor
+        whenRequest reset_sensor -> reset_detector
+
+    State eval_sample {
+        [#
+            val distance = MessagePayload.arg(currentMsg.msgContent(), 0).toDoubleOrNull() ?: Double.NaN
+            val Condition = detector.sample(distance, System.currentTimeMillis())
+        #]
+        if [# Condition != "" #] {
+            [# notifications++ #]
+            forward cargoservice -m sensor_state : sensor_state($Condition)
+        }
+    }
+    Goto monitoring
+    State update_led {
+        [#
+            val mode = MessagePayload.arg(currentMsg.msgContent(), 0)
+            if (mode == "blink" || mode == "off") led = mode
+            println("[SENSOR] LED logico: $led")
+        #]
+    }
+    Goto monitoring
+    State report_sensor {
+        [# val Data = org.json.JSONObject().put("led", led).put("present", detector.present()).put("notifications", notifications).toString() #]
+        [# answer("get_sensor_status", "sensor_status", "sensor_status('$Data')") #]
+    }
+    Goto monitoring
+    State reset_detector {
+        [#
+            val Result = if (CargoConfig.testMode()) "ok" else "disabled"
+            if (CargoConfig.testMode()) {
+                detector = PresenceDetector(CargoConfig.freeDistance(), CargoConfig.presenceMillis(), CargoConfig.sampleGapMillis())
+                notifications = 0
+            }
+        #]
+        if [# Result == "ok" #] {
+            forward cargoservice -m sensor_state : sensor_state(free)
+        }
+        replyTo reset_sensor with sensor_reset : sensor_reset($Result)
+    }
+    Goto monitoring
+}
+
+QActor ioportservice context ctxioport {
+    import "it.unibo.cargo.tools.MessagePayload"
+    [# var display = "ready"; var response = "" #]
+    State idle initial { }
+    Transition tio
+        whenMsg button_pressed -> requesting
+        whenReply load_accepted -> show_response
+        whenReply retrylater -> show_response
+        whenReply load_refused -> show_response
+        whenMsg display_update -> update_display
+        whenRequest get_ioport_status -> report_display
+    State requesting {
+        request cargoservice -m load_request : load_request(none)
+    }
+    Goto idle
+    State show_response {
+        [# response = currentMsg.msgContent(); println("[IOPORT] $response") #]
+    }
+    Goto idle
+    State update_display {
+        [# display = MessagePayload.arg(currentMsg.msgContent(), 0).removeSurrounding("'"); println("[DISPLAY] $display") #]
+    }
+    Goto idle
+    State report_display {
+        [# val Data = org.json.JSONObject().put("display", display).put("response", response).toString() #]
+        [# answer("get_ioport_status", "ioport_status", "ioport_status('$Data')") #]
+    }
+    Goto idle
+}

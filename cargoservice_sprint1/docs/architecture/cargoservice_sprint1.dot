@@ -1,0 +1,40 @@
+digraph "CargoService - Sprint 1" {
+	graph [bgcolor=white dpi=150 fontcolor="#2D3436" fontname=Arial fontsize=22 label="CargoService - Sprint 1" labelloc=t nodesep=0.9 pad=0.6 rankdir=LR ranksep=1.2 splines=spline]
+	node [fixedsize=true fontcolor="#2D3436" fontname=Arial fontsize=16 height=1.4 imagescale=true labelloc=b shape=box style=rounded width=1.4]
+	edge [arrowsize=0.8 color="#7B8894" fontname=Arial fontsize=14]
+	"1fb9f83c8a074dd59830012a1ef1f065" -> "3c05620a034340bbba00fdf793eb71cc" [label=button_pressed color=blue dir=forward fontcolor=blue fontname="Sans-Serif" fontsize=13]
+	"1fb9f83c8a074dd59830012a1ef1f065" -> "84b32d69b7b248c7bc9ff1e6edc1ae50" [label="sonar_sample(D)" color=red dir=forward fontcolor=red fontname="Sans-Serif" fontsize=13 style=dotted]
+	"3c05620a034340bbba00fdf793eb71cc" -> ba482fe9d43e44d98870b2a7527a5739 [label=<<FONT COLOR="magenta">load_request</FONT><BR/><FONT COLOR="darkgreen">load_accepted / retrylater / load_refused</FONT>> color=magenta dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	ba482fe9d43e44d98870b2a7527a5739 -> "3c05620a034340bbba00fdf793eb71cc" [label="display_update(DATA)" color=blue constraint=false dir=forward fontcolor=blue fontname="Sans-Serif" fontsize=13]
+	"84b32d69b7b248c7bc9ff1e6edc1ae50" -> ba482fe9d43e44d98870b2a7527a5739 [label="sensor_state(present | free)" color=blue dir=forward fontcolor=blue fontname="Sans-Serif" fontsize=13]
+	ba482fe9d43e44d98870b2a7527a5739 -> "84b32d69b7b248c7bc9ff1e6edc1ae50" [label="led_command(blink | off)" color=blue constraint=false dir=forward fontcolor=blue fontname="Sans-Serif" fontsize=13]
+	ba482fe9d43e44d98870b2a7527a5739 -> "44224910958644e9bed5dd2d27acfc46" [label=<<FONT COLOR="magenta">reach_target(TARGET)</FONT><BR/><FONT COLOR="darkgreen">target_reached / target_failed</FONT>> color=magenta dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	"44224910958644e9bed5dd2d27acfc46" -> "05a0656cf41043dc8bedcc5701922a1f" [label=<<FONT COLOR="magenta">moverobot(X,Y,STEPTIME)</FONT><BR/><FONT COLOR="darkgreen">moverobotdone / moverobotfailed / failed</FONT>> color=magenta dir=forward fontcolor="#2D3436" fontname="Sans-Serif" fontsize=13]
+	subgraph cluster_env {
+		graph [bgcolor="#fafafa" fontname="Sans-Serif" fontsize=20 label=env labeljust=l pencolor="#AEB6BE" rankdir=LR shape=box style=rounded]
+		"1fb9f83c8a074dd59830012a1ef1f065" [label="Pulsante / simulatore sonar" height=1.9 image="C:\Users\dodo0\Desktop\ISS_2026\cargoservice_sprint1\qakicons\system.PNG" shape=none]
+		subgraph "cluster_ctxioport : 8022" {
+			graph [bgcolor="#edf2f7" fontname=Arial fontsize=17 label="ctxioport : 8022" labeljust=l margin=24 pencolor="#AEB6BE" rankdir=LR shape=box style=rounded]
+			"3c05620a034340bbba00fdf793eb71cc" [label=ioportservice height=1.9 image="C:\Users\dodo0\Desktop\ISS_2026\cargoservice_sprint1\qakicons\symActorWithobjSmall.png" shape=none]
+		}
+		subgraph "cluster_ctxcargoservice : 8020" {
+			graph [bgcolor="#edf2f7" fontname=Arial fontsize=17 label="ctxcargoservice : 8020" labeljust=l margin=24 pencolor="#AEB6BE" rankdir=LR shape=box style=rounded]
+			ba482fe9d43e44d98870b2a7527a5739 [label=cargoservice height=1.9 image="C:\Users\dodo0\Desktop\ISS_2026\cargoservice_sprint1\qakicons\symActorWithobjSmall.png" shape=none]
+		}
+		subgraph "cluster_ctxsensor : 8023" {
+			graph [bgcolor="#edf2f7" fontname=Arial fontsize=17 label="ctxsensor : 8023" labeljust=l margin=24 pencolor="#AEB6BE" rankdir=LR shape=box style=rounded]
+			"84b32d69b7b248c7bc9ff1e6edc1ae50" [label=sensorservice height=1.9 image="C:\Users\dodo0\Desktop\ISS_2026\cargoservice_sprint1\qakicons\symActorWithobjSmall.png" shape=none]
+		}
+		subgraph "cluster_ctxcargorobot : 8021" {
+			graph [bgcolor="#edf2f7" fontname=Arial fontsize=17 label="ctxcargorobot : 8021" labeljust=l margin=24 pencolor="#AEB6BE" rankdir=LR shape=box style=rounded]
+			"44224910958644e9bed5dd2d27acfc46" [label=cargorobot height=1.9 image="C:\Users\dodo0\Desktop\ISS_2026\cargoservice_sprint1\qakicons\symActorWithobjSmall.png" shape=none]
+		}
+		subgraph "cluster_ctxrobotsmart : 8019" {
+			graph [bgcolor="#fff2de" fontname=Arial fontsize=17 label="ctxrobotsmart : 8019" labeljust=l margin=24 pencolor="#AEB6BE" rankdir=LR shape=box style=rounded]
+			"05a0656cf41043dc8bedcc5701922a1f" [label="robotsmart
+ExternalQActor" height=2.3 image="C:\Users\dodo0\Desktop\ISS_2026\cargoservice_sprint1\qakicons\externalQActor.png" shape=none]
+		}
+	}
+	label="CargoService - Sprint 1
+Magenta: request/reply (risposte in verde)   |   Blu: dispatch   |   Rosso puntinato: event"
+}

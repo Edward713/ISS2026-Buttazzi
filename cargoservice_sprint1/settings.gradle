@@ -1,0 +1,18 @@
+rootProject.name = 'cargoservice_sprint1'
+
+// I quattro runCtx possono partire insieme: la preparazione delle classi e seriale.
+// Il lock e rilasciato prima dell'avvio dei processi applicativi, che restano indipendenti.
+def lockDir = new File(settingsDir, '.gradle')
+lockDir.mkdirs()
+def compileChannel = java.nio.channels.FileChannel.open(
+    new File(lockDir, 'cargo-compilation.lock').toPath(),
+    java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.WRITE)
+def compileLock = compileChannel.lock()
+def releaseCompilation = {
+    if (compileLock.isValid()) compileLock.release()
+    if (compileChannel.isOpen()) compileChannel.close()
+}
+gradle.taskGraph.afterTask { task, state ->
+    if (task.path == ':classes') releaseCompilation()
+}
+gradle.buildFinished { result -> releaseCompilation() }
