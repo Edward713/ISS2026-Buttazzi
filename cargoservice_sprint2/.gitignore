@@ -1,0 +1,7 @@
+.gradle/
+build/
+logs/
+src-gen/
+*.log
+__pycache__/
+firmware/config.py

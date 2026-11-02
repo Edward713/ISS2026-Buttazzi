@@ -1,0 +1,16 @@
+services:
+  mqtt:
+    image: eclipse-mosquitto:2.0.22
+    ports:
+      - "${CARGO_MQTT_PORT:-1883}:1883"
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    restart: unless-stopped
+  wenv:
+    profiles: [navigation]
+    image: natbodocker/virtualrobotdisi26:1.0
+    volumes:
+      - ./wenv/PlayerControls.js:/home/node/WEnv/WebGLScene/js/controls/PlayerControls.js:ro
+    ports:
+      - "8090:8090"
+      - "8091:8091"

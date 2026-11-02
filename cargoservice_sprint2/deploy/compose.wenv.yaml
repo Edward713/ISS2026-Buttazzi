@@ -1,0 +1,16 @@
+# Variante con navigatore del corso in Docker: nessun robot mock.
+# Usare insieme a compose.yaml e al profilo navigation.
+services:
+  robotsmart:
+    image: natbodocker/robotsmart26:1.0
+    ports:
+      # Il descrittore nell'immagine usa 8020; CargoService lo raggiunge su 8019.
+      - "8019:8020"
+    environment:
+      VIRTUAL_ENV: wenv
+      MQTTBROKER: mqtt
+    volumes:
+      - ../config/tf25map.txt:/robotsmart26-1.0/bin/tf25map.txt:ro
+    depends_on:
+      - mqtt
+      - wenv

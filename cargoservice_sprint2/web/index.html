@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="it">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cargo Service · IOPort</title>
+<style>
+  :root {font:17px system-ui;color:#163047;background:#edf2f7}
+  body {max-width:850px;margin:5vh auto;padding:24px}
+  h1 {font-size:2.4rem;margin-bottom:8px} .subtitle {color:#536574}
+  main {background:white;border-radius:18px;padding:30px;margin-top:30px;box-shadow:0 8px 40px #16304712}
+  button {background:#245c86;color:white;border:0;padding:15px 24px;border-radius:9px;font:inherit;cursor:pointer}
+  button:disabled {opacity:.5;cursor:wait} #link {padding:12px;background:#fff1cc;border-radius:8px}
+  table {width:100%;border-collapse:collapse;margin:24px 0} th,td {padding:14px 8px;text-align:left;border-bottom:1px solid #e1e7ec}
+  td:last-child {overflow-wrap:anywhere;font-family:monospace;font-size:.8rem}
+  .error {color:#a32f26} .ok {color:#23724c} #response {min-height:2em;margin-top:20px}
+</style>
+<h1>Cargo Service</h1>
+<div class="subtitle">IOPort · Richiesta carico e stato della stiva</div>
+<main>
+  <div id="link" role="status">Collegamento in corso…</div>
+  <h2 id="service">Stato non disponibile</h2>
+  <p id="operation"></p><p id="sensor"></p>
+  <button id="load" disabled>Richiedi un carico</button>
+  <div id="response" role="status" aria-live="polite"></div>
+  <table><thead><tr><th>Slot</th><th>Stato</th><th>Barcode</th></tr></thead><tbody id="slots"></tbody></table>
+  <p id="marker"></p>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+let connected = false, pending = false, lastMessage = 0;
+function connection(ok) {
+  connected = ok;
+  $('link').textContent = ok ? 'Collegamento attivo · stato aggiornato' : 'Collegamento interrotto · visualizzazione non aggiornata';
+  $('link').style.background = ok ? '#e3f3e9' : '#fff1cc';
+  $('load').disabled = !ok || pending;
+}
+function show(state) {
+  const working = state.serviceStatus === 'WORKING';
+  $('service').textContent = working ? 'Service working' : 'Out of service';
+  $('service').className = working ? 'ok' : 'error';
+  $('operation').textContent = `Operazione: ${state.phase}`;
+  $('sensor').textContent = state.sensorAvailable ? (state.ioportOccupied ? 'IOPort occupata' : 'Sonar disponibile') : 'Sonar non disponibile · riprovare più tardi';
+  $('slots').replaceChildren(...state.slots.map(slot => {
+    const row = document.createElement('tr');
+    for (const text of [`slot${slot.id}`, {FREE:'Libero',RESERVED:'Prenotato',OCCUPIED:'Occupato'}[slot.state], slot.barcode || '—']) {
+      const cell = document.createElement('td'); cell.textContent = text; row.append(cell);
+    }
+    return row;
+  }));
+  $('marker').textContent = `Area marcatura (slot5): ${state.slot5 || 'libera'}`;
+}
+function connect() {
+  const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/state`);
+  ws.onmessage = event => {
+    const data = JSON.parse(event.data); lastMessage = Date.now(); connection(data.connected);
+    if (data.connected) show(data.state);
+  };
+  ws.onerror = () => ws.close();
+  ws.onclose = () => {connection(false);setTimeout(connect,1500)};
+  const watchdog = setInterval(() => {if (lastMessage && Date.now()-lastMessage>4000) {connection(false);ws.close()}},1000);
+  ws.addEventListener('close',()=>clearInterval(watchdog));
+}
+$('load').onclick = async () => {
+  pending = true; $('load').disabled = true;
+  try {
+    const response = await fetch('/api/load',{method:'POST',signal:AbortSignal.timeout(12000)});
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error);
+    $('response').textContent = data.response === 'load_accepted' ? `Carico accettato: ${data.slot} prenotato.` : data.response === 'retrylater' ? 'Riprovare più tardi (retrylater).' : 'Carico rifiutato: stiva piena (load_refused).';
+  } catch (error) {$('response').textContent = error.message || 'Esito non disponibile: controllare lo stato prima di riprovare.'}
+  finally {pending = false; $('load').disabled = !connected}
+};
+connect();
+</script>
+</html>
