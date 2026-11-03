@@ -1,7 +1,7 @@
-"""Adattatore HTTP/WebSocket, solo libreria standard Python 3.11.
+"""Adattatore HTTP/WebSocket
 
 Tutte le richieste applicative passano da ioportservice, anche il recupero
-dello stato dopo una riconnessione. Ogni POST possiede una connessione QAK.
+dello stato dopo una riconnessione.
 """
 import argparse
 import base64
