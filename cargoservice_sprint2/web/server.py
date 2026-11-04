@@ -151,7 +151,7 @@ class Handler(BaseHTTPRequestHandler):
                     self.wfile.write(ws_frame(payload))
                     self.wfile.flush()
                     previous, sent = payload, time.monotonic()
-                time.sleep(0.25)
+                time.sleep(0.5)
         except OSError:
             pass
 

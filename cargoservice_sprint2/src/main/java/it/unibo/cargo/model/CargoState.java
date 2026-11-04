@@ -5,7 +5,6 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import static it.unibo.cargo.model.LoadOperation.Phase.*;
 
-/** Aggregato posseduto esclusivamente dall'attore cargoservice; non invia messaggi. */
 public final class CargoState {
     private InMemoryHoldInventory inventory = new InMemoryHoldInventory();
     private InMemoryMarkingBuffer buffer = new InMemoryMarkingBuffer();
