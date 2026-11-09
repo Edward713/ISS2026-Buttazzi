@@ -1,0 +1,3 @@
+SCRIPT, generazione .ps1
+
+ti allego requisiti, il .qak, build.gradle, broker, server.py del web, i file di robotsmart26 del corso e il suo Arch_robotsmart26.py. genera degli script powershell per rigenerare il codice dal .qak senza dover aprire eclipse, configurare robotsmart26 su 8019 con la mappa, avviare e fermare tutto insieme (contesti, broker, web), e lo schema dell’architettura. lo schema deve essere come quello di robotsmart26 ma su tutto il sistema, contesti porte e messaggi, e si deve capire bene. niente percorsi fissi, deve andare su qualsiasi pc.

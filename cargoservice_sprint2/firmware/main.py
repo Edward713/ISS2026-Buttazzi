@@ -1,6 +1,4 @@
-"""Nodo esterno Raspberry Pi Pico W, MicroPython + umqtt.simple.
-Nessun attore QAK o decisione sul carico risiede sul microcontrollore.
-"""
+
 import asyncio
 import binascii
 import json
@@ -31,8 +29,6 @@ def blink_program():
     jmp(x_dec, 'low')[30]
     wrap()
 
-
-# Ogni semiperiodo dura 498 cicli. Il PIO continua anche durante connessioni o timeout MQTT.
 blinker = rp2.StateMachine(0, blink_program, freq=int(498000 / config.BLINK_MS), set_base=led)
 
 
@@ -77,6 +73,7 @@ async def acquire():
                     raise OSError('Wi-Fi non disponibile')
             # Una nuova sessione anche alla riconnessione: nessuna continuita oltre una disconnessione.
             session = binascii.hexlify(os.urandom(12)).decode()
+            print("Connessione Wi-Fi in corso...")
             client = MQTTClient(b'cargo-pico-' + binascii.hexlify(machine.unique_id()), config.MQTT_HOST,
                                 port=config.MQTT_PORT, keepalive=10)
             client.set_callback(command)
